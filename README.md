@@ -1,0 +1,1 @@
+ok so.... this is a weird ass website i found after digging through several arg websites and shit; it's like some sort of evil google or something. idk what it is tho lwk im just putting this here for preservation purposes.
