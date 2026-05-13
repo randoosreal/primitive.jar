@@ -5,7 +5,6 @@ import useSWR, { mutate } from 'swr'
 import { createClient } from '@/lib/supabase/client'
 import { ForumPost } from '@/components/forum/forum-post'
 import { NewPostModal } from '@/components/forum/new-post-modal'
-import { CategoryFilter } from '@/components/category-filter'
 
 const CATEGORIES = ['ALL', 'CONSPIRACY', 'SIGHTINGS', 'DOCUMENTS', 'THEORIES', 'LOCATIONS', 'GENERAL'] as const
 
@@ -20,6 +19,14 @@ interface Post {
   votes: number
   created_at: string
   comment_count?: number
+  is_pinned?: boolean
+  is_hot?: boolean
+  image_url?: string | null
+}
+
+interface CategoryCount {
+  category: string
+  count: number
 }
 
 const fetcher = async (category: Category) => {
@@ -28,6 +35,7 @@ const fetcher = async (category: Category) => {
   let query = supabase
     .from('forum_posts')
     .select('*')
+    .order('is_pinned', { ascending: false })
     .order('created_at', { ascending: false })
   
   if (category !== 'ALL') {
@@ -53,6 +61,28 @@ const fetcher = async (category: Category) => {
   return postsWithCounts
 }
 
+const fetchCategoryCounts = async () => {
+  const supabase = createClient()
+  const counts: Record<string, number> = { ALL: 0 }
+  
+  for (const cat of CATEGORIES) {
+    if (cat === 'ALL') {
+      const { count } = await supabase
+        .from('forum_posts')
+        .select('*', { count: 'exact', head: true })
+      counts.ALL = count || 0
+    } else {
+      const { count } = await supabase
+        .from('forum_posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('category', cat)
+      counts[cat] = count || 0
+    }
+  }
+  
+  return counts
+}
+
 export default function ForumPage() {
   const [selectedCategory, setSelectedCategory] = useState<Category>('ALL')
   const [isNewPostModalOpen, setIsNewPostModalOpen] = useState(false)
@@ -74,7 +104,13 @@ export default function ForumPage() {
     { revalidateOnFocus: false }
   )
 
-  const handleNewPost = async (title: string, content: string, category: string) => {
+  const { data: categoryCounts } = useSWR(
+    'forum_category_counts',
+    fetchCategoryCounts,
+    { revalidateOnFocus: false }
+  )
+
+  const handleNewPost = async (title: string, content: string, category: string, imageUrl?: string) => {
     const supabase = createClient()
     
     const { error } = await supabase
@@ -84,6 +120,7 @@ export default function ForumPage() {
         content,
         category,
         author_name: 'Anonymous',
+        image_url: imageUrl || null,
       })
     
     if (error) {
@@ -92,6 +129,7 @@ export default function ForumPage() {
     }
     
     mutate(['forum_posts', selectedCategory])
+    mutate('forum_category_counts')
     setIsNewPostModalOpen(false)
   }
 
@@ -149,11 +187,25 @@ export default function ForumPage() {
           </button>
         </div>
 
-        <CategoryFilter
-          categories={CATEGORIES}
-          selected={selectedCategory}
-          onSelect={(cat) => setSelectedCategory(cat as Category)}
-        />
+        {/* Category filter with counts */}
+        <div className="flex flex-wrap gap-2">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3 py-1.5 text-xs uppercase tracking-wider transition-colors ${
+                selectedCategory === cat
+                  ? 'bg-primary text-black'
+                  : 'border border-primary/30 text-primary/60 hover:border-primary hover:text-primary'
+              }`}
+            >
+              {cat}
+              {categoryCounts && categoryCounts[cat] > 0 && (
+                <span className="ml-1.5 opacity-70">{categoryCounts[cat]}</span>
+              )}
+            </button>
+          ))}
+        </div>
 
         <div className="mt-8 space-y-4">
           {isLoading && (

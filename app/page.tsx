@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Search } from 'lucide-react'
 
 export default function HomePage() {
@@ -17,9 +18,11 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
-      <h1 className="mb-16 text-6xl font-bold tracking-[0.3em] text-primary md:text-8xl">
-        PRIMITIVE
-      </h1>
+      <Link href="/Home">
+        <h1 className="mb-16 cursor-pointer text-6xl font-bold tracking-[0.3em] text-primary transition-opacity hover:opacity-80 md:text-8xl">
+          PRIMITIVE
+        </h1>
+      </Link>
       
       <form onSubmit={handleSearch} className="w-full max-w-2xl">
         <div className="relative flex items-center border border-primary bg-transparent">

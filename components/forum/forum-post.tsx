@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
+import { ChevronUp, ChevronDown, MessageSquare, Flame, Pin, Zap, Image as ImageIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { CommentSection } from './comment-section'
 
@@ -14,6 +14,9 @@ interface Post {
   votes: number
   created_at: string
   comment_count?: number
+  is_pinned?: boolean
+  is_hot?: boolean
+  image_url?: string | null
 }
 
 interface ForumPostProps {
@@ -25,6 +28,7 @@ interface ForumPostProps {
 export function ForumPost({ post, onVote, sessionId }: ForumPostProps) {
   const [showComments, setShowComments] = useState(false)
   const [userVote, setUserVote] = useState<1 | -1 | null>(null)
+  const [showImage, setShowImage] = useState(false)
 
   useEffect(() => {
     const fetchUserVote = async () => {
@@ -64,8 +68,11 @@ export function ForumPost({ post, onVote, sessionId }: ForumPostProps) {
     })
   }
 
+  // Determine if post should show lightning (random popular posts)
+  const showLightning = post.votes > 30 && post.votes < 100
+
   return (
-    <article className="border border-border-muted bg-black p-4">
+    <article className={`border bg-black p-4 ${post.is_pinned ? 'border-primary' : 'border-border-muted'}`}>
       <div className="flex gap-4">
         {/* Vote buttons */}
         <div className="flex flex-col items-center gap-1">
@@ -91,7 +98,26 @@ export function ForumPost({ post, onVote, sessionId }: ForumPostProps) {
         {/* Content */}
         <div className="flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
+            {/* Pin icon for pinned posts */}
+            {post.is_pinned && (
+              <Pin className="h-4 w-4 text-primary" />
+            )}
+            
+            {/* Lightning icon for trending posts */}
+            {showLightning && (
+              <Zap className="h-4 w-4 text-primary" />
+            )}
+            
             <h3 className="text-lg font-semibold text-primary">{post.title}</h3>
+            
+            {/* HOT badge */}
+            {post.is_hot && (
+              <span className="flex items-center gap-1 rounded border border-primary bg-primary/10 px-2 py-0.5 text-xs uppercase text-primary">
+                <Flame className="h-3 w-3" />
+                HOT
+              </span>
+            )}
+            
             <span className="rounded border border-primary/50 px-2 py-0.5 text-xs uppercase text-primary">
               {post.category}
             </span>
@@ -106,6 +132,28 @@ export function ForumPost({ post, onVote, sessionId }: ForumPostProps) {
           <p className="mb-4 whitespace-pre-wrap text-sm text-primary/80">
             {post.content}
           </p>
+          
+          {/* Image attachment */}
+          {post.image_url && (
+            <div className="mb-4">
+              <button
+                onClick={() => setShowImage(!showImage)}
+                className="flex items-center gap-2 text-sm text-primary/60 transition-colors hover:text-primary"
+              >
+                <ImageIcon className="h-4 w-4" />
+                <span>{showImage ? 'Hide' : 'Show'} Attachment</span>
+              </button>
+              {showImage && (
+                <div className="mt-2 border border-border-muted p-2">
+                  <img
+                    src={post.image_url}
+                    alt="Post attachment"
+                    className="max-h-64 w-auto object-contain"
+                  />
+                </div>
+              )}
+            </div>
+          )}
           
           <button
             onClick={() => setShowComments(!showComments)}

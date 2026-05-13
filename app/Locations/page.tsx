@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { createClient } from '@/lib/supabase/client'
-import { MapPin, ExternalLink, Copy, Check } from 'lucide-react'
-import { CategoryFilter } from '@/components/category-filter'
+import { Crosshair, ExternalLink, Copy, Check, Lock } from 'lucide-react'
 
 const CATEGORIES = ['ALL', 'SUSPICIOUS', 'CLASSIFIED', 'ANOMALOUS', 'RESTRICTED', 'UNKNOWN'] as const
 
@@ -18,6 +17,7 @@ interface Location {
   category: string
   access_notes: string | null
   created_at: string
+  updated_at?: string
 }
 
 const fetcher = async (category: Category) => {
@@ -36,6 +36,28 @@ const fetcher = async (category: Category) => {
   
   if (error) throw error
   return data
+}
+
+const fetchCategoryCounts = async () => {
+  const supabase = createClient()
+  const counts: Record<string, number> = { ALL: 0 }
+  
+  for (const cat of CATEGORIES) {
+    if (cat === 'ALL') {
+      const { count } = await supabase
+        .from('locations')
+        .select('*', { count: 'exact', head: true })
+      counts.ALL = count || 0
+    } else {
+      const { count } = await supabase
+        .from('locations')
+        .select('*', { count: 'exact', head: true })
+        .eq('category', cat)
+      counts[cat] = count || 0
+    }
+  }
+  
+  return counts
 }
 
 function LocationCard({ location }: { location: Location }) {
@@ -57,16 +79,18 @@ function LocationCard({ location }: { location: Location }) {
   }
 
   const getGoogleMapsUrl = (coords: string) => {
-    // Parse coordinates and create Google Maps URL
-    const cleanCoords = coords.replace(/°/g, '').replace(/\s/g, '')
     return `https://www.google.com/maps/search/${encodeURIComponent(coords)}`
   }
+
+  // Categories that show lock icon
+  const lockedCategories = ['CLASSIFIED', 'RESTRICTED']
+  const showLock = lockedCategories.includes(location.category)
 
   return (
     <article className="border border-border-muted bg-black p-4">
       <div className="mb-2 flex items-start justify-between gap-4">
         <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-primary/60" />
+          <Crosshair className="h-4 w-4 text-primary" />
           <h3 className="text-lg font-semibold text-primary">{location.name}</h3>
         </div>
         <a
@@ -74,37 +98,41 @@ function LocationCard({ location }: { location: Location }) {
           target="_blank"
           rel="noopener noreferrer"
           className="flex-shrink-0 text-primary/60 transition-colors hover:text-primary"
+          title="Open in Google Maps"
         >
           <ExternalLink className="h-4 w-4" />
         </a>
       </div>
       
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-        <span className="rounded border border-primary/50 px-2 py-0.5 uppercase text-primary">
+        <span className="flex items-center gap-1 rounded border border-primary/50 px-2 py-0.5 uppercase text-primary">
+          {showLock && <Lock className="h-3 w-3" />}
           {location.category}
         </span>
         <span className="text-primary/40">•</span>
-        <span className="text-primary/60">Updated {formatDate(location.created_at)}</span>
+        <span className="text-primary/60">
+          Updated {formatDate(location.updated_at || location.created_at)}
+        </span>
       </div>
 
       {/* Coordinates box */}
-      <div className="mb-3 flex items-center justify-between bg-muted p-3">
+      <div className="mb-3 flex items-center justify-between border border-border-muted bg-muted p-3">
         <div>
           <div className="text-xs uppercase text-primary/40">Coordinates</div>
-          <div className="text-sm text-primary">{location.coordinates}</div>
+          <div className="font-mono text-sm text-primary">{location.coordinates}</div>
         </div>
         <button
           onClick={copyCoordinates}
-          className="text-xs uppercase text-primary/60 transition-colors hover:text-primary"
+          className="flex items-center gap-1 text-xs uppercase text-primary/60 transition-colors hover:text-primary"
         >
           {copied ? (
-            <span className="flex items-center gap-1">
+            <>
               <Check className="h-3 w-3" /> Copied
-            </span>
+            </>
           ) : (
-            <span className="flex items-center gap-1">
+            <>
               <Copy className="h-3 w-3" /> Copy
-            </span>
+            </>
           )}
         </button>
       </div>
@@ -130,6 +158,15 @@ export default function LocationsPage() {
     { revalidateOnFocus: false }
   )
 
+  const { data: categoryCounts } = useSWR(
+    'location_category_counts',
+    fetchCategoryCounts,
+    { revalidateOnFocus: false }
+  )
+
+  // Categories that show lock icon
+  const lockedCategories = ['CLASSIFIED', 'RESTRICTED']
+
   return (
     <div className="min-h-screen px-4 py-20 md:px-8">
       <div className="mx-auto max-w-4xl">
@@ -137,11 +174,26 @@ export default function LocationsPage() {
           Locations
         </h1>
 
-        <CategoryFilter
-          categories={CATEGORIES}
-          selected={selectedCategory}
-          onSelect={(cat) => setSelectedCategory(cat as Category)}
-        />
+        {/* Category filter with counts and lock icons */}
+        <div className="flex flex-wrap gap-2">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`flex items-center gap-1 px-3 py-1.5 text-xs uppercase tracking-wider transition-colors ${
+                selectedCategory === cat
+                  ? 'bg-primary text-black'
+                  : 'border border-primary/30 text-primary/60 hover:border-primary hover:text-primary'
+              }`}
+            >
+              {lockedCategories.includes(cat) && <Lock className="h-3 w-3" />}
+              {cat}
+              {categoryCounts && categoryCounts[cat] > 0 && (
+                <span className="ml-1 opacity-70">{categoryCounts[cat]}</span>
+              )}
+            </button>
+          ))}
+        </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           {isLoading && (

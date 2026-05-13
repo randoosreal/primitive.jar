@@ -7,6 +7,10 @@ export interface ForumPost {
   votes: number
   created_at: string
   updated_at: string
+  is_pinned?: boolean
+  is_hot?: boolean
+  image_url?: string | null
+  comment_count?: number
 }
 
 export interface ForumComment {
@@ -44,6 +48,7 @@ export interface Location {
   category: 'SUSPICIOUS' | 'CLASSIFIED' | 'ANOMALOUS' | 'RESTRICTED' | 'UNKNOWN'
   access_notes: string | null
   created_at: string
+  updated_at?: string
 }
 
 export const FORUM_CATEGORIES = ['ALL', 'CONSPIRACY', 'SIGHTINGS', 'DOCUMENTS', 'THEORIES', 'LOCATIONS', 'GENERAL'] as const
